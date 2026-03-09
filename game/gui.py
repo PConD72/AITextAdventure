@@ -23,13 +23,14 @@ from game.spectrum import (
     ROOM_NAME_COLOR, SEPARATOR_COLOR, DIM_COLOR,
 )
 from game.room_art import draw_room, draw_splash
-from game.engine import GameState, process_command, get_look_text
+from game.engine import GameState, process_command, get_look_text, tick_world
 
 TITLE = "The Forgotten Depths"
 FPS = 30
 CURSOR_BLINK_MS = 500
 WIN_BORDER = 24
-REVEAL_DELAY_MS = 120  # ms between each line during slow reveal
+REVEAL_DELAY_MS = 120   # ms between each line during slow reveal
+WORLD_TICK_MS = 3500    # ms between autonomous world event ticks
 
 
 def _strip_ansi(text):
@@ -91,6 +92,8 @@ class SpectrumGUI:
         self.more_waiting = False   # showing (more), waiting for keypress
         self.revealing = False      # line-by-line animation in progress
         self.reveal_timer = 0
+
+        self.world_timer = 0
 
         self.input_text = ""
         self.input_history = []
@@ -187,6 +190,26 @@ class SpectrumGUI:
         self._anchor_bottom()
 
     # ------------------------------------------------------------------
+    #  Autonomous world events
+    # ------------------------------------------------------------------
+
+    def _tick_world(self):
+        msg = tick_world(self.gs)
+        if msg:
+            self._add_event_message(msg)
+
+    def _add_event_message(self, msg):
+        """Insert an asynchronous event message (spider action etc.)."""
+        items = []
+        for wl in _word_wrap(msg, self.cols):
+            items.append((TEXT, wl, BRIGHT_CYAN))
+        if self.revealing or self.more_waiting:
+            self.pending.extend(items)
+        else:
+            self.buffer.extend(items)
+            self._anchor_bottom()
+
+    # ------------------------------------------------------------------
     #  Building content from game output
     # ------------------------------------------------------------------
 
@@ -261,6 +284,13 @@ class SpectrumGUI:
                     if not self.pending:
                         self.revealing = False
                         self.reveal_timer = 0
+
+            # Autonomous world events (spider etc.)
+            if self.state == "playing" and self.gs:
+                self.world_timer += dt
+                if self.world_timer >= WORLD_TICK_MS:
+                    self.world_timer = 0
+                    self._tick_world()
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:

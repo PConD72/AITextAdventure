@@ -66,6 +66,12 @@ def cmd_look(gs, cmd, force_long=False):
         for item in visible_items:
             lines.append(f"  {item.description}")
 
+    # Mechanical spider presence
+    if gs.spider.room == gs.player["room"]:
+        lines.append("")
+        lines.append("A small mechanical spider crouches nearby, "
+                      "its bronze legs clicking softly.")
+
     exit_dirs = ", ".join(room.exits.keys())
     lines.append(dim(f"\n[Exits: {exit_dirs}]"))
 
@@ -80,6 +86,23 @@ def cmd_examine(gs, cmd):
 
     if room.dark and not _has_light(gs):
         return "It's too dark to see anything."
+
+    # Check for the mechanical spider
+    if cmd.noun in ("spider", "robot", "mechanical spider", "automaton"):
+        if gs.spider.room == gs.player["room"]:
+            carrying = ""
+            if gs.spider.inventory:
+                names = ", ".join(i.name for i in gs.spider.inventory)
+                carrying = f" It appears to be carrying: {names}."
+            return (
+                "A marvel of ancient engineering -- a spider-like "
+                "automaton the size of a small dog. Its body is made "
+                "of tarnished bronze, with eight articulated legs "
+                "that click rhythmically on the stone floor. Two "
+                "crystal eyes glow faintly green. It seems to be "
+                "observing you with mechanical curiosity." + carrying
+            )
+        return "You don't see any spider here."
 
     # Check inventory first
     item = _find_in_inventory(gs, cmd.noun)
@@ -366,6 +389,20 @@ def cmd_step(gs, cmd):
 
 def cmd_talk(gs, cmd):
     room = gs.current_room()
+
+    # Talk to the mechanical spider
+    if cmd.noun in ("spider", "robot", "mechanical spider", "automaton"):
+        if gs.spider.room == gs.player["room"]:
+            import random
+            from game.spider import SPEECH
+            phrase = random.choice(SPEECH)
+            return (
+                f'You address the mechanical spider. It tilts its '
+                f'head, crystal eyes flickering, and responds:\n'
+                f'"{phrase}"\n'
+                f'You have no idea what it means.'
+            )
+        return "There's no spider here to talk to."
 
     if room.id == "prison_cells" and not gs.flags.get("whitmore_freed"):
         return (

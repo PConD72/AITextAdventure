@@ -9,6 +9,7 @@ import os
 from game.world import build_world
 from game.parser import parse
 from game.commands import COMMANDS
+from game.spider import SpiderRobot
 from game.utils import (
     print_wrapped, bold, dim, get_input, clear_screen, print_slow
 )
@@ -30,6 +31,8 @@ class GameState:
         self.score_items = {}
         self.visited_rooms = set()
         self.pending_message = None
+
+        self.spider = SpiderRobot()
 
         # Give starting items
         self.player["inventory"].append(self.items["lantern"])
@@ -71,6 +74,7 @@ class GameState:
             "visited_rooms": list(self.visited_rooms),
             "room_data": room_items,
             "item_states": item_states,
+            "spider": self.spider.to_dict(),
         }
 
     def load_save_dict(self, data):
@@ -104,6 +108,10 @@ class GameState:
                         item = self.items[iid]
                         if item not in self.player["inventory"]:
                             room.items.append(item)
+
+        # Restore spider state
+        if "spider" in data:
+            self.spider.load_dict(data["spider"], self.items)
 
 
 def save_game(gs):
@@ -179,6 +187,12 @@ def get_look_text(gs):
     return cmd_look(gs, dummy, force_long=True)
 
 
+def tick_world(gs):
+    """Advance autonomous world events by one tick.
+    Returns a message string if something visible happened, else None."""
+    return gs.spider.tick(gs)
+
+
 def run_game(gs):
     """Main game loop (CLI version)."""
     from game.commands import _calc_score
@@ -215,3 +229,8 @@ def run_game(gs):
         result, _ = process_command(gs, raw)
         if result:
             print_wrapped(result)
+
+        # Tick the world after each command (CLI fallback)
+        event = tick_world(gs)
+        if event:
+            print_wrapped(event)
